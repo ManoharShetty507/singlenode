@@ -1,0 +1,9 @@
+---
+- name: Deploy NFS Subdir External Provisioner
+  hosts: k8s_node
+  become: yes
+  tasks:
+    - name: Deploy NFS Subdir External Provisioner
+      import_role:
+        roles:
+          - nfs_setup

@@ -1,0 +1,32 @@
+---
+- name: Update apt package list
+  apt:
+    update_cache: yes
+
+- name: Install nfs-common package
+  apt:
+    name: nfs-common
+    state: present
+
+- name: Add Helm repository for NFS Subdir External Provisioner
+  shell: "helm repo add nfs-subdir-external-provisioner {{ helm_repo_url }}"
+  args:
+    creates: /etc/helm/repositories.yaml
+
+- name: Install NFS Subdir External Provisioner using Helm
+  shell: |
+    helm install nfs-subdir-external-provisioner \
+    nfs-subdir-external-provisioner/nfs-subdir-external-provisioner \
+    --set nfs.server={{ nfs_ip }} \
+    --set nfs.path={{ nfs_path }} \
+    --set storageClass.onDelete={{ storage_class_delete_behavior | lower }}
+  args:
+    chdir: /tmp
+
+- name: Check storage class status
+  shell: kubectl get storageclass {{ storage_class_name }}
+  register: storageclass_output
+
+- name: Display storage class status
+  debug:
+    msg: "{{ storageclass_output.stdout }}"

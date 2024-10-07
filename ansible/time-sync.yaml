@@ -1,0 +1,7 @@
+---
+- name: Synchronize time on all servers
+  hosts: master
+  become: yes
+
+  roles:
+    - sync_time

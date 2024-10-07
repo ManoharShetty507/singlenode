@@ -1,0 +1,6 @@
+# Default variables
+nfs_ip: "10.124.0.9"  # Default NFS server IP
+nfs_path: "/data/nfs"  # Default NFS export path
+helm_repo_url: "https://kubernetes-sigs.github.io/nfs-subdir-external-provisioner"
+storage_class_name: "nfs-client"
+storage_class_delete_behavior: true

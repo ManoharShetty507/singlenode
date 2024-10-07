@@ -1,0 +1,16 @@
+---
+- name: Install NTP package
+  apt:
+    name: ntp
+    state: present
+    update_cache: yes
+
+- name: Ensure NTP service is enabled and running
+  service:
+    name: ntp
+    state: started
+    enabled: yes
+
+- name: Synchronize time immediately
+  command: ntpdate -u pool.ntp.org
+  notify: Restart

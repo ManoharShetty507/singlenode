@@ -1,0 +1,157 @@
+- name: Enable and start kubelet service
+  service:
+    name: kubelet
+    state: started
+    enabled: yes    
+- name: Check kubelet service status
+  shell: systemctl status kubelet
+  register: kubelet_status
+
+- name: Disable swap
+  command: swapoff -a
+  when: ansible_swaptotal_mb > 0
+
+- name: Remove swap entries from /etc/fstab
+  replace:
+    path: /etc/fstab
+    regexp: '^.*swap.*$'
+    replace: ''
+    when: ansible_swaptotal_mb > 0
+
+- name: Ensure swap is disabled
+  mount:
+    name: swap
+    state: absent
+    when: ansible_swaptotal_mb > 0
+
+- name: Reboot the system to apply changes
+  reboot:
+    msg: "Reboot initiated by Ansible to disable swap"
+    connect_timeout: 5
+    reboot_timeout: 600
+  when: ansible_swaptotal_mb > 0
+  
+- name: Display kubelet service status
+  debug:
+    var: kubelet_status.stdout_lines
+
+- name: Check kubelet logs
+  shell: journalctl -xeu kubelet --no-pager
+  register: kubelet_logs
+
+- name: Display kubelet logs
+  debug:
+    var: kubelet_logs.stdout_lines
+        
+- name: Check if kubeadm config images are pulled
+  command: "kubeadm config images list"
+  register: kubeadm_images
+  changed_when: false # Mark this task as not changed if the command output is as expected
+  
+- name: Pull the correct sandbox image version
+  command: ctr images pull registry.k8s.io/pause:3.9
+  register: pull_sandbox_image
+  ignore_errors: yes
+
+- name: Set cgroup driver in kubelet configuration
+  lineinfile:
+    path: /etc/default/kubelet
+    line: 'KUBELET_EXTRA_ARGS="--cgroup-driver=systemd"'
+    create: yes
+
+ - name: Restart kubelet service to apply cgroup changes
+  systemd:
+    name: kubelet
+    state: restarted
+    enabled: yes
+
+- name: Check kubelet status
+  shell: systemctl status kubelet
+  register: kubelet_status
+  failed_when: "'running' not in kubelet_status.stdout"
+  ignore_errors: yes
+
+- name: Print kubelet status for debugging
+  debug:
+    var: kubelet_status
+  when: kubelet_status.failed
+      
+- name: Pull kubeadm config images if not already pulled
+  command: "kubeadm config images pull"
+  when: kubeadm_images.stdout.find('image1') == -1
+
+- name: Check if Kubernetes is already initialized
+  stat:
+    path: /etc/kubernetes/admin.conf
+  register: k8s_initialized
+  
+- name: Initialize the Kubernetes control plane
+  shell: "kubeadm init --pod-network-cidr=192.168.0.0/16 --ignore-preflight-errors=NumCPU --ignore-preflight-errors=Mem --control-plane-endpoint '{{ LOAD_BALANCER_IP }}:{{ LOAD_BALANCER_PORT }}' --upload-certs"
+  args:
+    executable: /bin/bash
+  when: not k8s_initialized.stat.exists
+  
+- name: Check if /etc/kubernetes directory exists
+  stat:
+    path: /etc/kubernetes
+  register: kubernetes_dir
+
+- name: Print status message based on directory existence
+  debug:
+    msg: "/etc/kubernetes folder {{ 'exists' if kubernetes_dir.stat.exists else 'does not exist' }}."
+
+- name: Check if Kubernetes is already initialized (kube-apiserver)
+  stat:
+    path: /etc/kubernetes/manifests/kube-apiserver.yaml
+  register: k8s_apiserver_initialized
+
+- name: Create .kube folder for ansible-user
+  become: yes
+  file:
+    path: "/home/ansible-user/.kube"
+    state: directory
+    owner: ansible-user
+    group: ansible-user
+    mode: "0755"
+  when: not k8s_initialized.stat.exists
+
+- name: Copy admin.conf to .kube folder for ansible-user
+  become: yes
+  copy:
+    src: /etc/kubernetes/admin.conf
+    dest: /home/ansible-user/.kube/config
+    owner: ansible-user
+    group: ansible-user
+    mode: "0644"
+    remote_src: yes
+  when: not k8s_initialized.stat.exists
+
+- name: Create .kube folder for root
+  file:
+    path: "/root/.kube"
+    state: directory
+    owner: "root"
+    mode: "0755"
+
+- name: Copy admin.conf to .kube folder for root
+  copy:
+    src: /etc/kubernetes/admin.conf
+    dest: "/root/.kube/config"
+    owner: "root"
+    mode: "0644"
+    remote_src: yes
+
+- name: Copy admin.conf
+  become: yes
+  copy:
+    src: /etc/kubernetes/admin.conf
+    dest: /tmp/admin.conf
+    remote_src: yes
+
+- name: Change permissions of admin.conf to ansible-user readable
+  file:
+    path: /etc/kubernetes/admin.conf
+    owner: ansible-user
+    group: ansible-user
+    mode: "0644"
+

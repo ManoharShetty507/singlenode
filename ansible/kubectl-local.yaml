@@ -1,0 +1,9 @@
+---
+- name: setup_kubectl
+  hosts: local
+  become: yes
+  tasks:
+    - name: Setup kubectl on bastion
+      import_role:
+        name: package
+      when: ansible_host == "3.108.185.55"
