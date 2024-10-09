@@ -1,9 +1,8 @@
-- name: Load necessary kernel modules
+- name: Load necessary kernel modules if not already loaded
+  become: true
   shell: |
-    modprobe overlay
-    modprobe br_netfilter
-  args:
-    warn: false
+    lsmod | grep -q overlay || modprobe overlay
+    lsmod | grep -q br_netfilter || modprobe br_netfilter
 
 - name: Ensure kernel modules are loaded at boot
   copy:
