@@ -1,16 +1,22 @@
 ---
-- name: Install NTP package
+- name: Install chrony
+  become: true
   apt:
-    name: ntp
+    name: chrony
     state: present
-    update_cache: yes
 
-- name: Ensure NTP service is enabled and running
-  service:
-    name: ntp
+- name: Start and enable chrony service
+  become: true
+  systemd:
+    name: chrony
     state: started
     enabled: yes
 
-- name: Synchronize time immediately
-  command: ntpdate -u pool.ntp.org
-  notify: Restart
+- name: Synchronize time immediately with chrony
+  become: true
+  command: chronyc -a makestep
+  notify: Restart chrony
+
+- name: Verify time synchronization
+  become: true
+  command: timedatectl status
