@@ -59,7 +59,7 @@
     line: 'KUBELET_EXTRA_ARGS="--cgroup-driver=systemd"'
     create: yes
 
- - name: Restart kubelet service to apply cgroup changes
+- name: Restart kubelet service to apply cgroup changes
   systemd:
     name: kubelet
     state: restarted
