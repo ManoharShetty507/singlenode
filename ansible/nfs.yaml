@@ -5,5 +5,4 @@
   tasks:
     - name: Setup NFS Server
       import_role:
-        roles:
-          - nfs
+        name: nfs
