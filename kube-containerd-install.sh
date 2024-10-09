@@ -1,112 +1,190 @@
 #!/bin/bash
-set -e # Exit on error
+
+sudo su -
+
+# User creation
+user_name="ansible-user"
+user_home="/home/$user_name"
+user_ssh_dir="$user_home/.ssh"
+
+# Check if the user already exists
+if id "$username" &>/dev/null; then
+  echo "User $username already exists."
+  exit 1
+fi
+
+# Create the user
+sudo adduser --disabled-password --gecos "" "$user_name"
+
+# Inform user creation success
+echo "User $user_name has been created successfully."
+
+# Add user to sudoer group
+echo "ansible-user ALL=(ALL) NOPASSWD:ALL" | sudo tee /etc/sudoers.d/ansible-user
+
+# Switch to user from root
+su - ansible-user
+
+# Install AWS CLI
 sudo apt-get update -y
+sudo apt-get install -y awscli
+# sudo apt install python3-pip
 
-cat <<EOF | sudo tee /etc/modules-load.d/containerd.conf
-overlay
-br_netfilter
-EOF
+# Install ansible
+sudo apt-add-repository ppa:ansible/ansible -y
+sudo apt update -y
+sudo apt install ansible -y
 
-sudo modprobe overlay
-sudo modprobe br_netfilter
+# Create .ssh directory if not exists
+mkdir -p $user_ssh_dir
+chmod 700 $user_ssh_dir
 
-# Setup required sysctl params, these persist across reboots.
-cat <<EOF | sudo tee /etc/sysctl.d/99-kubernetes-cri.conf
-net.bridge.bridge-nf-call-iptables  = 1
-net.ipv4.ip_forward                 = 1
-net.bridge.bridge-nf-call-ip6tables = 1
-EOF
+# Generate SSH key pair if not exists
+if [ ! -f "$user_ssh_dir/id_rsa" ]; then
+  ssh-keygen -t rsa -b 4096 -f $user_ssh_dir/id_rsa -N ""
+fi
 
-# Apply sysctl params without reboot
-sudo sysctl --system
+chown -R $user_name:$user_name $user_home
 
-sudo apt-get update
-sudo apt-get -y install containerd
+# Delete existing public key file in S3 bucket if exists
+aws s3 rm s3://my-key1/server.pub
+# if aws s3 ls s3://my-key1/server.pub; then
+#    aws s3 rm s3://my-key1/server.pub
+#fi
 
-sudo mkdir -p /etc/containerd
-containerd config default | sudo tee /etc/containerd/config.toml
+# Upload public key to S3 bucket with a custom name
+aws s3 cp $user_ssh_dir/id_rsa.pub s3://my-key1/server.pub
 
-sudo systemctl restart containerd
-#systemctl status containerd
+#logi =n into user
+user_name="ansible-user"
+user_home="/home/$user_name"
+user_ssh_dir="$user_home/.ssh"
+ssh_key_path="$user_ssh_dir/authorized_keys"
 
-sleep 5s
+mkdir -p $user_ssh_dir
+chmod 700 $user_ssh_dir
 
-# ls -l install.sh
-# chmod u+x install.sh
-# ls -l install.sh
-# ./install.sh
+aws s3 cp s3://my-key/server.pub $ssh_key_path
+chmod 600 $ssh_key_path
+chown -R $user_name:$user_name $user_home
 
-sudo apt-get update
-sudo apt-get install -y apt-transport-https ca-certificates curl
+cd
+# Navigate to home directory and log a message
+cd $user_home && echo "correct till this step" >>/var/log/main-data.log 2>&1
 
-curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.30/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+export AWS_REGION=ap-south-1
 
-echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.30/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
+git clone https://github.com/ManoharShetty507/singlenode.git
 
-sudo apt-get update
-sudo apt-get install -y kubelet kubeadm kubectl
-sudo apt-mark hold kubelet kubeadm kubectl
-#sudo apt install -y kubeadm=1.18.13-00 kubelet=1.18.13-00 kubectl=1.18.13-00 --allow-downgrades --allow-change-held-packages
-#sudo apt-get install -y kubelet=1.21.0-00 kubeadm=1.21.0-00 kubectl=1.21.0-00
+# Define the inventory file and log file
+# Define the inventory file and log file
+INVENTORY_FILE="singlenode/ansible/inventories/inventory.ini"
+LOG_FILE="ansible_script.log"
 
-#sudo apt-mark hold kubelet kubeadm kubectl
+# Logging function
+log() {
+  local message="$1"
+  echo "$(date +"%Y-%m-%d %H:%M:%S") - $message" | sudo tee -a "$LOG_FILE"
+}
 
-kubeadm version
+# Function to update or add entries
+update_entry() {
+  local section=$1
+  local host=$2
+  local ip=$3
 
-# chmod u+x install kube-install.sh
-# ./install kube-install.sh
+  log "Updating entry: Section: $section, Host: $host, IP: $ip"
 
-# sudo kubeadm init
+  # Ensure the section header exists
+  if ! grep -q "^\[$section\]" "$INVENTORY_FILE"; then
+    log "Section $section not found. Adding section header."
+    sudo bash -c "echo -e '\n[$section]' >>'$INVENTORY_FILE'"
+  fi
 
-# This command as root user
-#kubeadm init
+  # Remove existing entry if it exists
+  sudo sed -i "/^\[$section\]/,/^\[.*\]/{/^$host ansible_host=.*/d}" "$INVENTORY_FILE"
 
-# Exit root user & exeucte below three command as normal user
+  # Add or update the entry
+  sudo sed -i "/^\[$section\]/a $host ansible_host=$ip" "$INVENTORY_FILE"
+}
 
-# mkdir -p $HOME/.kube
-# sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
-# sudo chown $(id -u):$(id -g) $HOME/.kube/config
+# Check if the inventory file exists
+if [ ! -f "$INVENTORY_FILE" ]; then
+  log "Inventory file not found: $INVENTORY_FILE"
+  exit 1
+fi
+# Fetch NFS IP and update the inventory file
+NFS_IP=$(aws ec2 describe-instances --region ap-south-1 --filters "Name=tag:Name,Values=nfs" --query "Reservations[*].Instances[*].PublicIpAddress" --output text)
 
-# This command also as normal user
-# kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')"
+# Fetch the NFS IP and update the inventory file
+if [ -z "$NFS_IP" ]; then
+  log "Failed to fetch Bastion IP"
+  exit 1
+fi
+log "NFS IP: $NFS_IP"
 
-# This is to regenerta the token again
-# kubeadm token create --print-join-command
+# Fetch the Bastion host public IP
+log "Fetching Bastion IP"
+BASTION_IP=$(aws ec2 describe-instances --region ap-south-1 --filters "Name=tag:Name,Values=k8s-instance" --query "Reservations[*].Instances[*].PublicIpAddress" --output text)
 
-# use the token in workers as root
+# Check if the IP is fetched successfully
+if [ -z "$BASTION_IP" ]; then
+  log "Failed to fetch Bastion IP"
+  exit 1
+fi
+log "Bastion IP: $BASTION_IP"
 
-# untaint master and schedule pod on it
-#kubectl taint nodes <nodename> node-role.kubernetes.io/master:NoSchedule-
-# kubectl taint nodes ip-10-200-1-40 node-role.kubernetes.io/control-plane-
-# This command as root user
-#kubeadm init
+# Update the inventory file
+log "Updating inventory file with NFS and Bastion IPs"
 
-# Exit root user & exeucte below three command as normal user
+# Use a temporary file to avoid editing issues
+TEMP_FILE=$(mktemp)
 
-# mkdir -p $HOME/.kube
-# sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
-# sudo chown $(id -u):$(id -g) $HOME/.kube/config
+# Flag to track if local and nfs sections have been found
+LOCAL_FOUND=false
+NFS_FOUND=false
 
-# This command also as normal user
-# kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')"
+# Read the inventory file and modify it
+while IFS= read -r line; do
+  # Check for the local section
+  if [[ "$line" == "[local]" ]]; then
+    echo "$line" >>"$TEMP_FILE"
+    # Check if Bastion IP is already present
+    if ! grep -q "$BASTION_IP" "$INVENTORY_FILE"; then
+      echo "$BASTION_IP" >>"$TEMP_FILE" # Add Bastion IP under local if not exists
+    else
+      log "Bastion IP $BASTION_IP already exists in the inventory file."
+    fi
+    LOCAL_FOUND=true
+    continue
+  fi
 
-# This is to regenerta the token again
-# kubeadm token create --print-join-command
+  # Check for the nfs section
+  if [[ "$line" == "[nfs]" ]]; then
+    echo "$line" >>"$TEMP_FILE"
+    # Check if NFS IP is already present
+    if ! grep -q "$NFS_IP" "$INVENTORY_FILE"; then
+      echo "$NFS_IP" >>"$TEMP_FILE" # Add NFS IP under nfs if not exists
+    else
+      log "NFS IP $NFS_IP already exists in the inventory file."
+    fi
+    NFS_FOUND=true
+    continue
+  fi
 
-# use the token in workers as root
-# kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
+  echo "$line" >>"$TEMP_FILE" # Write the line as is
+done <"$INVENTORY_FILE"
 
-# kubectl apply -f https://docs.projectcalico.org/manifests/calico.yaml
-#kubectl --kubeconfig=/etc/kubernetes/admin.conf create -f https://docs.projectcalico.org/v3.14/manifests/calico.yaml
-# kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
+# If local or nfs sections were not found, append them at the end
+if [ "$LOCAL_FOUND" = false ]; then
+  echo -e "\n[local]\n$BASTION_IP" >>"$TEMP_FILE"
+fi
 
-# untaint master and schedule pod on it
-#kubectl taint nodes <nodename> node-role.kubernetes.io/master:NoSchedule-
+if [ "$NFS_FOUND" = false ]; then
+  echo -e "\n[nfs]\n$NFS_IP" >>"$TEMP_FILE"
+fi
 
-# apt-mark unhold kubeadm && apt-get update && apt-get install -y kubeadm=1.23.0-00 && apt-mark hold kubeadm
+# Replace the original inventory file with the updated one
+mv "$TEMP_FILE" "$INVENTORY_FILE"
 
-#sudo apt-get install -qy kubelet=1.9.6-00 kubectl=1.9.6-00 kubeadm=1.9.6-00
-
-# https://stackoverflow.com/questions/49721708/how-to-install-specific-version-of-kubernetes
-
-echo "Script completed successfully!" | sudo tee script_completion.log
+log "Inventory file updated successfully"
