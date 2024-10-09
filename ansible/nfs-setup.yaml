@@ -6,4 +6,4 @@
     - name: Deploy NFS Subdir External Provisioner
       import_role:
         roles:
-          - nfs_setup
+          - nfs-setup
