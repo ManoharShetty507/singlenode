@@ -5,4 +5,4 @@
   tasks:
     - name: Deploy NFS Subdir External Provisioner
       import_role:
-        name: nfs_setup
+        name: nfs-setup
