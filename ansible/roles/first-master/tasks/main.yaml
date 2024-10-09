@@ -1,5 +1,5 @@
 - name: Check if Kubernetes is already initialized
-  delegate_to: master1
+  delegate_to: local
   stat:
     path: /etc/kubernetes/admin.conf
   register: k8s_initialized
