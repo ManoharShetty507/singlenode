@@ -59,14 +59,14 @@
     flat: yes
 
 - name: Clean up temporary admin.conf on remote node
-  delegate_to: master
+  delegate_to: local
   become: yes
   ansible.builtin.file:
     path: /tmp/admin.conf
     state: absent
   when: admin_conf_stat.stat.exists
 - name: Set ownership and permissions of fetched config file on Ansible control node
-  delegate_to: master
+  delegate_to: local
   file:
     path: /home/ansible-user/.kube/config
     owner: ansible-user
