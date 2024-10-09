@@ -4,4 +4,4 @@
   become: yes
 
   roles:
-    - sync_time
+    - time_sync
