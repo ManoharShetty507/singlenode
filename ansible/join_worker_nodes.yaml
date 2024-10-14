@@ -1,6 +1,6 @@
 ---
 - name: Join worker nodes to Kubernetes cluster
-  hosts: controlplane
+  hosts: local
   become: yes
   tasks:
     - name: Generate kubeadm join command with token
@@ -13,7 +13,7 @@
         join_command: "{{ join_command_output.stdout }}"
 
 - name: Join worker nodes to Kubernetes cluster
-  hosts: workers
+  hosts: node
   become: yes
   tasks:
     - name: Ensure kubeadm is installed
@@ -21,12 +21,16 @@
         name: kubeadm
         state: present
 
+    - name: Check if local group is defined
+      fail:
+        msg: "No hosts in the local group. Please check your inventory."
+      when: groups['local'] | length == 0
+
     - name: Join worker node to cluster
-      command: "{{ hostvars['master'].join_command }}"
-      # Replace master0 with the appropriate name of your master node if necessary
+      command: "{{ hostvars[groups['local'][0]].join_command }}"  # Use the first local node in the group
       register: join_output
       ignore_errors: yes
 
     - name: Print join output
       debug:
-        msg: "{{ join_output.stdout }}"
+        msg: "{{ join_output.stdout if join_output is defined and join_output.stdout is defined else 'Join command failed or was not executed.' }}"
