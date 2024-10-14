@@ -41,32 +41,20 @@
     path: /tmp/admin.conf # Path where you want to store admin.conf locally
   register: admin_conf_stat
 
-- name: Fetch admin.conf from remote node if not already fetched
-  delegate_to: master
-  become: yes
-  fetch:
-    remote_src: yes
-    src: /etc/kubernetes/admin.conf
-    dest: /tmp/admin.conf
-    flat: yes
-  when: not admin_conf_stat.stat.exists
 
 - name: Fetch Kubernetes config from remote node
-  delegate_to: master
   fetch:
     src: /tmp/admin.conf
     dest: /home/ansible-user/.kube/config
     flat: yes
 
 - name: Clean up temporary admin.conf on remote node
-  delegate_to: local
   become: yes
   ansible.builtin.file:
     path: /tmp/admin.conf
     state: absent
   when: admin_conf_stat.stat.exists
 - name: Set ownership and permissions of fetched config file on Ansible control node
-  delegate_to: local
   file:
     path: /home/ansible-user/.kube/config
     owner: ansible-user
