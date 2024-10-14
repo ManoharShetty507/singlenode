@@ -29,7 +29,7 @@
     msg: "Kubeadm config file exists: {{ kubeadm_config.stat.exists }}"
 
 - name: Initialize the Kubernetes master
-  command: kubeadm init --config /etc/kubernetes/kubeadm-config.yaml --ignore-preflight-errors=NumCPU,Mem
+  shell: "kubeadm init --pod-network-cidr=192.168.0.0/16 --ignore-preflight-errors=NumCPU --ignore-preflight-errors=Mem"
   when: kubeadm_config.stat.exists
   register: kubeadm_init
   failed_when: kubeadm_init.rc != 0
@@ -59,6 +59,21 @@
     mode: "0755"
   when: not k8s_initialized.stat.exists
 
+- name: Check if Kubernetes is initialized
+  stat:
+    path: /etc/kubernetes/admin.conf
+  register: k8s_initialized
+
+- name: Create .kube folder for ansible-user
+  become: yes
+  file:
+    path: "/home/ansible-user/.kube"
+    state: directory
+    owner: ansible-user
+    group: ansible-user
+    mode: "0755"
+  when: k8s_initialized is not defined or not k8s_initialized.stat.exists
+
 - name: Copy admin.conf to .kube folder for ansible-user
   become: yes
   copy:
@@ -68,7 +83,7 @@
     group: ansible-user
     mode: "0644"
     remote_src: yes
-  when: not k8s_initialized.stat.exists
+  when: k8s_initialized is not defined or not k8s_initialized.stat.exists
 
 - name: Create .kube folder for root
   file:
@@ -76,6 +91,7 @@
     state: directory
     owner: "root"
     mode: "0755"
+
 
 - name: Copy admin.conf to .kube folder for root
   copy:
