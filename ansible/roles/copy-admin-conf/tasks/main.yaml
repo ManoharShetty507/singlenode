@@ -5,7 +5,6 @@
       register: admin_conf_stat
 
     - name: Fetch admin.conf from managed node if not already fetched
-      delegate_to: control-plane
       fetch:
         src: /etc/kubernetes/admin.conf
         dest: /tmp/admin.conf
