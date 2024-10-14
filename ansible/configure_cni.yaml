@@ -1,7 +1,7 @@
 
 ---
 - name: configure cni
-  hosts: master
+  hosts: local
   tasks:
     - name: Import Calico Networking role
       import_role:
