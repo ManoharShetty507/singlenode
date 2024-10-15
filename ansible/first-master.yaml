@@ -1,6 +1,6 @@
 ---
 - name: setup_kubectl
-  hosts: k8s_node
+  hosts: local
   become: yes
   tasks:
     - name: initialize the master0
