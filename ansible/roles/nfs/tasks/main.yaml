@@ -26,7 +26,7 @@
 
 - name: Apply NFS export configuration from template
   template:
-    src: exports.j2
+    src: nfs_exports.j2
     dest: /etc/exports
 
 - name: Export NFS shares
