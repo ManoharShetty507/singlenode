@@ -1,6 +1,6 @@
 ---
 - name: fetch config
-  hosts: master[0]
+  hosts: local
   become: yes
   gather_facts: false
   environment:
