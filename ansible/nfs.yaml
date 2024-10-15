@@ -1,6 +1,6 @@
 ---
 - name: Setup NFS Server
-  hosts: nfs_server
+  hosts: nfs
   become: yes
   tasks:
     - name: Setup NFS Server
