@@ -20,3 +20,37 @@
 - name: Debug EBS CSI driver installation result
   debug:
     msg: "{{ kubectl_apply_output.stdout }}"
+
+# Check if StorageClass already exists
+- name: Check if StorageClass gp2 exists
+  command: "kubectl get storageclass gp2"
+  register: storageclass_check
+  failed_when: storageclass_check.rc not in [0, 1]
+  changed_when: False
+
+- name: Create StorageClass if it does not exist
+  template:
+    src: storageclass.yaml.j2
+    dest: /tmp/storageclass.yaml
+  when: storageclass_check.rc == 1
+
+- name: Apply StorageClass if it does not exist
+  command: "kubectl apply -f /tmp/storageclass.yaml"
+  when: storageclass_check.rc == 1
+
+# Check if PersistentVolumeClaim already exists
+- name: Check if PersistentVolumeClaim ebs-pvc exists
+  command: "kubectl get pvc ebs-pvc"
+  register: pvc_check
+  failed_when: pvc_check.rc not in [0, 1]
+  changed_when: False
+
+- name: Create PersistentVolumeClaim if it does not exist
+  template:
+    src: persistentvolumeclaim.yaml.j2
+    dest: /tmp/persistentvolumeclaim.yaml
+  when: pvc_check.rc == 1
+
+- name: Apply PersistentVolumeClaim if it does not exist
+  command: "kubectl apply -f /tmp/persistentvolumeclaim.yaml"
+  when: pvc_check.rc == 1
