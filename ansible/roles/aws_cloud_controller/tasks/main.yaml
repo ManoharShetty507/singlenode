@@ -33,5 +33,5 @@
   delay: 30
 
 - name: Debug Cloud Controller Manager installation result
-  debug:
-    msg: "{{ kubectl_apply_output.stdout }}"
+  ansible.builtin.debug:
+    var: kubectl_apply_output
