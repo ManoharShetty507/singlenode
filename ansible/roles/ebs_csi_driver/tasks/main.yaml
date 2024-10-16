@@ -1,0 +1,22 @@
+---
+- name: Ensure that kubectl is installed
+  command: "which kubectl"
+  register: kubectl_check
+  changed_when: False
+  failed_when: kubectl_check.rc != 0
+
+- name: Apply the EBS CSI Driver using kustomize from the GitHub repository
+  command: >
+    kubectl apply -k "github.com/kubernetes-sigs/aws-ebs-csi-driver/deploy/kubernetes/overlays/stable/?ref=master"
+  register: kubectl_apply_output
+
+- name: Check if EBS CSI driver was applied successfully
+  command: "kubectl get pods -n kube-system -l app=ebs-csi-controller"
+  register: ebs_driver_check
+  until: ebs_driver_check.rc == 0
+  retries: 5
+  delay: 30
+
+- name: Debug EBS CSI driver installation result
+  debug:
+    msg: "{{ kubectl_apply_output.stdout }}"
