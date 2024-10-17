@@ -40,10 +40,10 @@
   command: "kubectl apply -f /tmp/storageclass.yaml"
   when: storageclass_check.rc == 1
 
-# Annotate StorageClass gp2 as default if it exists
+# Annotate StorageClass gp2 as default if it exists or after creation
 - name: Annotate StorageClass gp2 as default
   command: "kubectl annotate storageclass gp2 storageclass.kubernetes.io/is-default-class=true --overwrite"
-  when: storageclass_check.rc == 0
+  when: storageclass_check.rc in [0, 1]  # This will run if gp2 exists or was just created
 
 # Check if PersistentVolumeClaim already exists
 - name: Check if PersistentVolumeClaim ebs-pvc exists
