@@ -13,12 +13,13 @@
       kubectl apply -k "github.com/kubernetes-sigs/aws-ebs-csi-driver/deploy/kubernetes/overlays/stable/?ref=master"
     register: kubectl_apply_output
   
-  - name: Check if EBS CSI driver was applied successfully
-    command: "kubectl get pods -n kube-system -l app=ebs-csi-controller"
-    register: ebs_driver_check
-    until: ebs_driver_check.rc == 0
-    retries: 5
-    delay: 30
+- name: Check if EBS CSI driver pods are running
+  command: "kubectl get pods -n kube-system -l app=ebs-csi-controller -o jsonpath='{.items[*].status.phase}'"
+  register: ebs_pods_status
+  until: "'Running' in ebs_pods_status.stdout.split() and ebs_pods_status.stdout.split() | select('search', '^Running$') | list | length == ebs_pods_status.stdout.split() | length"
+  retries: 5
+  delay: 30
+
   
   - name: Debug EBS CSI driver installation result
     debug:
