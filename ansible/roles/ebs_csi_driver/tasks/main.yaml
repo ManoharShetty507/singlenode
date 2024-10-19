@@ -1,63 +1,74 @@
 ---
-- name: Ensure that kubectl is installed
-  command: "which kubectl"
-  register: kubectl_check
-  changed_when: False
-  failed_when: kubectl_check.rc != 0
-
-- name: Apply the EBS CSI Driver using kustomize from the GitHub repository
-  command: >
-    kubectl apply -k "github.com/kubernetes-sigs/aws-ebs-csi-driver/deploy/kubernetes/overlays/stable/?ref=master"
-  register: kubectl_apply_output
-
-- name: Check if EBS CSI driver was applied successfully
-  command: "kubectl get pods -n kube-system -l app=ebs-csi-controller"
-  register: ebs_driver_check
-  until: ebs_driver_check.rc == 0
-  retries: 5
-  delay: 30
-
-- name: Debug EBS CSI driver installation result
-  debug:
-    msg: "{{ kubectl_apply_output.stdout }}"
-
-# Check if StorageClass gp2 exists
-- name: Check if StorageClass gp2 exists
-  command: "kubectl get storageclass gp2"
-  register: storageclass_check
-  failed_when: storageclass_check.rc not in [0, 1]
-  changed_when: False
-
-# Create StorageClass if it does not exist
-- name: Create StorageClass gp2
-  template:
-    src: storageclass.yaml.j2
-    dest: /tmp/storageclass.yaml
-  when: storageclass_check.rc == 1
-
-# Apply StorageClass if it was created
-- name: Apply StorageClass if it was created
-  command: "kubectl apply -f /tmp/storageclass.yaml"
-  when: storageclass_check.rc == 1
-
-# Annotate StorageClass gp2 as default if it exists or after creation
-- name: Annotate StorageClass gp2 as default
-  command: "kubectl annotate storageclass gp2 storageclass.kubernetes.io/is-default-class=true --overwrite"
-  when: storageclass_check.rc in [0, 1]  # This will run if gp2 exists or was just created
-
-# Check if PersistentVolumeClaim already exists
-- name: Check if PersistentVolumeClaim ebs-pvc exists
-  command: "kubectl get pvc ebs-pvc"
-  register: pvc_check
-  failed_when: pvc_check.rc not in [0, 1]
-  changed_when: False
-
-- name: Create PersistentVolumeClaim if it does not exist
-  template:
-    src: persistentvolumeclaim.yaml.j2
-    dest: /tmp/persistentvolumeclaim.yaml
-  when: pvc_check.rc == 1
-
-- name: Apply PersistentVolumeClaim if it does not exist
-  command: "kubectl apply -f /tmp/persistentvolumeclaim.yaml"
-  when: pvc_check.rc == 1
+- name: Ensure EBS CSI Driver and PVC Setup
+  hosts: localhost
+  tasks:
+  - name: Ensure that kubectl is installed
+    command: "which kubectl"
+    register: kubectl_check
+    changed_when: False
+    failed_when: kubectl_check.rc != 0
+  
+  - name: Apply the EBS CSI Driver using kustomize from the GitHub repository
+    command: >
+      kubectl apply -k "github.com/kubernetes-sigs/aws-ebs-csi-driver/deploy/kubernetes/overlays/stable/?ref=master"
+    register: kubectl_apply_output
+  
+  - name: Check if EBS CSI driver was applied successfully
+    command: "kubectl get pods -n kube-system -l app=ebs-csi-controller"
+    register: ebs_driver_check
+    until: ebs_driver_check.rc == 0
+    retries: 5
+    delay: 30
+  
+  - name: Debug EBS CSI driver installation result
+    debug:
+      msg: "{{ kubectl_apply_output.stdout }}"
+  
+  # Check if StorageClass gp2 exists
+  - name: Check if StorageClass gp2 exists
+    command: "kubectl get storageclass gp2"
+    register: storageclass_check
+    failed_when: storageclass_check.rc not in [0, 1]
+    changed_when: False
+  
+  # Create StorageClass if it does not exist
+  - name: Create StorageClass gp2
+    template:
+      src: storageclass.yaml.j2
+      dest: /tmp/storageclass.yaml
+    when: storageclass_check.rc == 1
+  
+  # Apply StorageClass if it was created
+  - name: Apply StorageClass if it was created
+    command: "kubectl apply -f /tmp/storageclass.yaml"
+    when: storageclass_check.rc == 1
+  
+  # Annotate StorageClass gp2 as default if it exists or after creation
+  - name: Annotate StorageClass gp2 as default
+    command: "kubectl annotate storageclass gp2 storageclass.kubernetes.io/is-default-class=true --overwrite"
+    when: storageclass_check.rc in [0, 1]  # This will run if gp2 exists or was just created
+  
+  # Check if EBS CSI driver pods are running before applying PVC
+  - name: Check if EBS CSI driver pods are running
+    command: "kubectl get pods -n kube-system -l app=ebs-csi-controller -o jsonpath='{.items[*].status.phase}'"
+    register: ebs_pods_status
+    until: ebs_pods_status.stdout | lower == "running"  # Ensure pods are running
+    retries: 5
+    delay: 30
+  
+  # Check if PersistentVolumeClaim already exists
+  - name: Check if PersistentVolumeClaim ebs-pvc exists
+    command: "kubectl get pvc ebs-pvc"
+    register: pvc_check
+    failed_when: pvc_check.rc not in [0, 1]
+    changed_when: False
+  
+  - name: Create PersistentVolumeClaim if it does not exist
+    template:
+      src: persistentvolumeclaim.yaml.j2
+      dest: /tmp/persistentvolumeclaim.yaml
+    when: pvc_check.rc == 1
+  
+  - name: Apply PersistentVolumeClaim if it does not exist
+    command: "kubectl apply -f /tmp/persistentvolumeclaim.yaml"
+    when: pvc_check.rc == 1
