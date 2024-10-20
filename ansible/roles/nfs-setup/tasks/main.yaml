@@ -8,6 +8,29 @@
     name: nfs-common
     state: present
 
+- name: Ensure mount directory exists
+  ansible.builtin.file:
+    path: /mnt/myshare
+    state: directory
+
+  # Manually mount the NFS share
+- name: Mount NFS share manually
+  ansible.builtin.mount:
+    path: /mnt/myshare
+    src: "10.200.1.12:/mnt/myshare"
+    fstype: nfs
+    opts: rw,sync,no_subtree_check
+    state: mounted
+
+  # Make the NFS mount persistent across reboots
+- name: Ensure NFS mount is persistent across reboots
+  ansible.builtin.mount:
+    path: /mnt/myshare
+    src: "10.200.1.12:/mnt/myshare"
+    fstype: nfs
+    opts: rw,sync,no_subtree_check
+    state: present
+
 - name: Add Helm repository for NFS Subdir External Provisioner
   shell: "helm repo add nfs-subdir-external-provisioner {{ helm_repo_url }}"
   args:
@@ -26,6 +49,19 @@
 - name: Check storage class status
   shell: kubectl get storageclass {{ storage_class_name }}
   register: storageclass_output
+
+- name: Patch Kubernetes StorageClass
+  become: false
+  community.kubernetes.k8s:
+    api_version: storage.k8s.io/v1
+    kind: StorageClass
+    name: "<your-storage-class-name>"
+    merge_type: merge
+    patch:
+      metadata:
+        annotations:
+          storageclass.kubernetes.io/is-default-class: "true"
+  delegate_to: local
 
 - name: Display storage class status
   debug:
