@@ -25,6 +25,11 @@
         --output text
       register: nfs_ip_output
 
+    - name: Check if NFS IP was fetched
+      fail:
+        msg: "Failed to fetch NFS IP. Please check the instance tag and AWS configuration."
+      when: nfs_ip_output.stdout | length == 0
+
     - name: Set NFS IP fact
       set_fact:
         nfs_ip: "{{ nfs_ip_output.stdout }}"
