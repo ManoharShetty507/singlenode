@@ -16,7 +16,7 @@
 # Mount NFS share using shell command
 - name: Mount NFS share manually
   shell: |
-     sudo mount -t nfs {{mfs_ip }}:/mnt/myshare /mnt
+     sudo mount -t nfs {{nfs_ip }}:/mnt/myshare /mnt
   become: true  # Use become to ensure the command runs with elevated permissions
 
 # Make the NFS mount persistent across reboots
