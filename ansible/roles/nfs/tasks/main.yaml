@@ -12,7 +12,7 @@
 
 - name: Create NFS export directory
   file:
-    path: "{{ nfs_path }}"
+    path: "{{ nfs_export_dir }}"
     state: directory
     owner: nobody
     group: nogroup
