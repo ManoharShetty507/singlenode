@@ -11,4 +11,4 @@
 - import_playbook: aws_cloud_controller.yaml hostlist=local
 - import_playbook: nfs.yaml hostlist=local
 - import_playbook: nfs-setup-playbook.yaml hostlist=local
-- import_playbook: nfs-setup.yaml hostlist=local
+- import_playbook: nfs-setup.yaml hostlist=local,node
