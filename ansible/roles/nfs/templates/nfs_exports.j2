@@ -1,3 +1,3 @@
 # /etc/exports - NFS exports file
 
-/data/nfs1 10.0.8.0/16(rw,sync,no_subtree_check,no_root_squash)
+{{ nfs_path }} {{ nfs_network_range }}({{ nfs_export_options }})
