@@ -1,6 +1,6 @@
 ---
 - name: Apply label to all Kubernetes nodes
-  hosts: local
+  hosts: master1,master2,master3
   gather_facts: false
 
   tasks:
@@ -15,11 +15,6 @@
     - name: Label each node with control-plane role
       loop: "{{ nodes }}"
       command: kubectl label node {{ item }} node-role.kubernetes.io/control-plane=true --overwrite
-
-    - name: Label the same master node with empty control-plane label
-      loop: "{{ nodes }}"
-      when: item == ansible_hostname  # Replace with the condition to identify your master node
-      command: kubectl label nodes {{ item }} node-role.kubernetes.io/control-plane="" --overwrite
 
     - name: Verify the label changes
       command: kubectl get nodes --show-labels
