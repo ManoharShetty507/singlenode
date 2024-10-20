@@ -1,4 +1,3 @@
----
 - name: Update apt package list
   apt:
     update_cache: yes
@@ -13,7 +12,7 @@
     path: /mnt/myshare
     state: directory
 
-  # Manually mount the NFS share
+# Manually mount the NFS share
 - name: Mount NFS share manually
   ansible.builtin.mount:
     path: /mnt/myshare
@@ -22,7 +21,7 @@
     opts: rw,sync,no_subtree_check
     state: mounted
 
-  # Make the NFS mount persistent across reboots
+# Make the NFS mount persistent across reboots
 - name: Ensure NFS mount is persistent across reboots
   ansible.builtin.mount:
     path: /mnt/myshare
@@ -51,17 +50,12 @@
   register: storageclass_output
 
 - name: Patch Kubernetes StorageClass
-  become: false
-  community.kubernetes.k8s:
-    api_version: storage.k8s.io/v1
-    kind: StorageClass
-    name: "<your-storage-class-name>"
-    merge_type: merge
-    patch:
-      metadata:
-        annotations:
-          storageclass.kubernetes.io/is-default-class: "true"
-  delegate_to: local
+  shell: |
+    kubectl patch storageclass {{ storage_class_name }} \
+    --type='merge' \
+    -p '{"metadata": {"annotations": {"storageclass.kubernetes.io/is-default-class": "true"}}}'
+  register: patch_output
+  ignore_errors: yes  # Optional: ignore errors if the patch fails
 
 - name: Display storage class status
   debug:
