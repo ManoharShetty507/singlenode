@@ -12,7 +12,7 @@
 
 - name: Create NFS export directory
   file:
-    path: "{{ nfs_export_dir }}"
+    path: "{{ nfs_path }}"
     state: directory
     owner: nobody
     group: nogroup
@@ -20,7 +20,7 @@
 
 - name: Set group read-write-execute permissions and setgid on NFS directory
   file:
-    path: "{{ nfs_export_dir }}"
+    path: "{{ nfs_path }}"
     mode: "2775"
     recurse: yes
 
@@ -45,3 +45,9 @@
 
 - debug:
     msg: "{{ showmount_output.stdout }}"
+
+# Handlers
+- name: Restart NFS server
+  systemd:
+    name: nfs-kernel-server
+    state: restarted
