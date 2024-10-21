@@ -1,4 +1,4 @@
- ---
+---
 - name: Apply label to all Kubernetes nodes
   hosts: local
   gather_facts: false
@@ -21,6 +21,8 @@
       loop: "{{ nodes }}"
       when: item == inventory_hostname
       command: kubectl label nodes {{ item }} node-role.kubernetes.io/control-plane="" --overwrite
+      register: label_output
+      delegate_to: node
 
     - name: Verify control-plane label
       command: kubectl get nodes --show-labels
@@ -29,5 +31,3 @@
     - name: Display verification output
       debug:
         var: verify_output.stdout_lines
-~
-~
