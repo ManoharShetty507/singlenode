@@ -1,5 +1,5 @@
 ---
-- name: Apply label to all Kubernetes nodes
+- name: Apply label and taint to all Kubernetes nodes
   hosts: local
   gather_facts: false
 
@@ -16,7 +16,11 @@
       loop: "{{ nodes }}"
       command: kubectl label node {{ item }} node-role.kubernetes.io/control-plane=true --overwrite
 
-    - name: Verify the label changes
+    - name: Taint each control-plane node
+      loop: "{{ nodes }}"
+      command: kubectl taint nodes {{ item }} node-role.kubernetes.io/control-plane=:NoSchedule --overwrite
+
+    - name: Verify the label and taint changes
       command: kubectl get nodes --show-labels
       register: verify_output
 
