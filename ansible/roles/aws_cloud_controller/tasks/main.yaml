@@ -18,12 +18,17 @@
     version: master
     force: yes
 
+- name: Delete existing AWS Cloud Controller Manager manifests if present
+  command: "kubectl delete -k ."
+  args:
+    chdir: /tmp/cloud-provider-aws/examples/existing-cluster/base
+  ignore_errors: true  # Ignore errors if no resources are found
+
 - name: Apply AWS Cloud Controller Manager manifests
   ansible.builtin.command:
     cmd: "kubectl create -k ."
   args:
     chdir: /tmp/cloud-provider-aws/examples/existing-cluster/base
-
 
 - name: Check if AWS Cloud Controller Manager pods are running
   command: "kubectl get pods -n kube-system -l app=aws-cloud-controller-manager"
@@ -34,4 +39,4 @@
 
 - name: Debug Cloud Controller Manager installation result
   ansible.builtin.debug:
-    var: kubectl_apply_output
+    var: ccm_check  # Updated to use the correct variable for pod check
