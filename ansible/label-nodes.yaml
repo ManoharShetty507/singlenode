@@ -1,23 +1,24 @@
 ---
-- name: Apply label and taint to all Kubernetes nodes
+- name: Apply label and taint to control-plane nodes
   hosts: local
   gather_facts: false
 
   tasks:
     - name: Get the list of all Kubernetes nodes
-      shell: kubectl get nodes | awk '{print $1}'
-      register: node_list
+      shell: kubectl get nodes --show-labels | awk '{print $1, $NF}' | grep control-plane | awk '{print $1}'
+      register: control_plane_nodes
 
-    - name: Remove header from node list
-      set_fact:
-        nodes: "{{ node_list.stdout_lines[1:] }}"
+    - name: Verify control-plane nodes are found
+      fail:
+        msg: "No control-plane nodes found"
+      when: control_plane_nodes.stdout_lines | length == 0
 
-    - name: Label each node with control-plane role
-      loop: "{{ nodes }}"
+    - name: Label each control-plane node with control-plane role
+      loop: "{{ control_plane_nodes.stdout_lines }}"
       command: kubectl label node {{ item }} node-role.kubernetes.io/control-plane=true --overwrite
 
     - name: Taint each control-plane node
-      loop: "{{ nodes }}"
+      loop: "{{ control_plane_nodes.stdout_lines }}"
       command: kubectl taint nodes {{ item }} node-role.kubernetes.io/control-plane=:NoSchedule --overwrite
 
     - name: Verify the label and taint changes
@@ -27,4 +28,3 @@
     - name: Display verification output
       debug:
         var: verify_output.stdout_lines
-
