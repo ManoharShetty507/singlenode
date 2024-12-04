@@ -1,6 +1,6 @@
 ---
 - name: install cert manager
-  hosts: k8s_node
+  hosts: local
   become: yes
   tasks:
     - name: Install cert manager
