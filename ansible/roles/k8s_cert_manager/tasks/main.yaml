@@ -1,24 +1,53 @@
----
+- name: Set KUBECONFIG environment variable
+  ansible.builtin.set_fact:
+    kubectl_kubeconfig: /tmp/admin.conf
+
+- name: Fetch admin.conf
+  ansible.builtin.copy:
+    src: /etc/kubernetes/admin.conf
+    dest: /tmp/admin.conf
+  delegate_to: localhost
+
 - name: Add the Jetstack Helm repository
-  command:
-    cmd: helm repo add jetstack https://charts.jetstack.io
+  ansible.builtin.shell:
+    cmd: |
+      export KUBECONFIG={{ kubectl_kubeconfig }}
+      helm repo add jetstack https://charts.jetstack.io
+    executable: /bin/bash
 
 - name: Update Helm repositories
-  command:
-    cmd: helm repo update
+  ansible.builtin.shell:
+    cmd: |
+      export KUBECONFIG={{ kubectl_kubeconfig }}
+      helm repo update
+    executable: /bin/bash
 
 - name: Apply cert-manager CRDs
-  command:
-    cmd: kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.13.0/cert-manager.crds.yaml
+  ansible.builtin.shell:
+    cmd: |
+      export KUBECONFIG=/tmp/admin.conf
+      kubectl --kubeconfig=/tmp/admin.conf apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.13.0/cert-manager.crds.yaml
+    executable: /bin/bash
+  environment:
+    KUBECONFIG: /tmp/admin.conf
+  register: apply_cert_manager_crds
+  ignore_errors: yes  # Ignore errors if it’s a non-critical failure
+  failed_when: apply_cert_manager_crds.rc != 0
 
 - name: Create cert-manager namespace
-  command:
-    cmd: kubectl create namespace cert-manager
+  ansible.builtin.shell:
+    cmd: |
+      export KUBECONFIG={{ kubectl_kubeconfig }}
+      kubectl create namespace cert-manager
+    executable: /bin/bash
   ignore_errors: yes  # Ignore if the namespace already exists
 
 - name: Remove existing cert-manager Helm release
-  command:
-    cmd: helm uninstall cert-manager --namespace cert-manager
+  ansible.builtin.shell:
+    cmd: |
+      export KUBECONFIG={{ kubectl_kubeconfig }}
+      helm uninstall cert-manager --namespace cert-manager
+    executable: /bin/bash
   ignore_errors: yes  # Ignore if the release does not exist
 
 - name: Create values.yaml file for Helm installation
@@ -29,14 +58,8 @@
         defaultIssuerName: "letsencrypt-prod"
 
 - name: Install cert-manager using Helm
-  command:
-    cmd: helm install cert-manager jetstack/cert-manager --values /tmp/values.yaml --namespace cert-manager
-
-- name: Create ClusterIssuer configuration file
-  ansible.builtin.template:
-    src: cluster-issuer.yaml.j2
-    dest: /tmp/cluster-issuer.yaml
-
-- name: Apply ClusterIssuer configuration to Kubernetes
-  command:
-    cmd: kubectl apply -f /tmp/cluster-issuer.yaml
+  ansible.builtin.shell:
+    cmd: |
+      export KUBECONFIG={{ kubectl_kubeconfig }}
+      helm install cert-manager jetstack/cert-manager --namespace cert-manager --create-namespace -f /tmp/values.yaml
+    executable: /bin/bash
