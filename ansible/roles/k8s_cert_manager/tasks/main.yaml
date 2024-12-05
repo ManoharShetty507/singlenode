@@ -3,7 +3,7 @@
     src: /etc/kubernetes/admin.conf
     dest: /tmp/admin.conf
   delegate_to: localhost
-
+  become: true
 - name: Uninstall existing cert-manager if any
   command:
     cmd: helm uninstall cert-manager -n cert-manager
@@ -22,6 +22,8 @@
     cmd: helm upgrade --install cert-manager jetstack/cert-manager --namespace cert-manager --create-namespace --version v1.16.2 --set crds.enabled=true
   environment:
     KUBECONFIG: /tmp/admin.conf
+  async: 180  # Run the task asynchronously for 3 minutes (180 seconds)
+  poll: 0     # Do not wait for it to complete, just continue to the next task
 
 - name: Wait for cert-manager pods to be created
   shell: kubectl get pods -n cert-manager -o jsonpath='{.items[*].status.phase}' | grep -E 'Pending|Running'
@@ -32,5 +34,3 @@
   environment:
     KUBECONFIG: /tmp/admin.conf
   failed_when: cert_manager_pods_status.stdout == ""
-  success_when: cert_manager_pods_status.stdout != ""
-  # This will only mark the task as complete if pods are found to be running or pending
